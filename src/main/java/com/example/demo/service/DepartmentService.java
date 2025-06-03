@@ -3,6 +3,7 @@ package com.example.demo.service;
 import com.example.demo.dto.DepartmentSearchCriteria;
 import com.example.demo.model.Department;
 import org.springframework.data.domain.Page;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
@@ -22,4 +23,10 @@ public interface DepartmentService {
 
     Page<Department> searchDepartmentsByCriteria(DepartmentSearchCriteria criteria, Pageable pageable); // Tìm kiếm theo tiêu chí, có phân trang
     List<Department> searchDepartmentsByCriteria(DepartmentSearchCriteria criteria); // Tìm kiếm theo tiêu chí, trả về tất cả
+
+    /**
+     * Tạo một XSSFWorkbook chứa dữ liệu các department.
+     * @return XSSFWorkbook chứa dữ liệu.
+     */
+    XSSFWorkbook generateDepartmentsExcel();
 }

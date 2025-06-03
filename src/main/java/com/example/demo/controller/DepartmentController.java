@@ -7,13 +7,16 @@ import com.example.demo.dto.DepartmentSearchCriteria;
 import com.example.demo.model.Department;
 import com.example.demo.service.DepartmentService;
 import jakarta.validation.Valid; 
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.util.List;
 import java.util.UUID;
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/v1/departments") // Đường dẫn cơ sở cho các endpoint của department
@@ -121,6 +124,31 @@ public class DepartmentController {
             // Yêu cầu tìm kiếm và trả về tất cả kết quả (không phân trang)
             List<Department> departments = departmentService.searchDepartmentsByCriteria(criteria);
             return ResponseEntity.ok(departments);
+        }
+    }
+
+    // GET: Xuất danh sách departments ra file Excel
+    @GetMapping("/export/excel")
+    public void exportDepartmentsToExcel(HttpServletResponse response) {
+        try {
+            // Đặt content type và header cho việc tải file Excel
+            // Sử dụng timestamp trong tên file để tránh vấn đề caching và đảm bảo tính duy nhất
+            String filename = "departments_" + System.currentTimeMillis() + ".xlsx";
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+
+            XSSFWorkbook workbook = departmentService.generateDepartmentsExcel();
+
+            workbook.write(response.getOutputStream());
+            workbook.close(); // Quan trọng: đóng workbook để giải phóng tài nguyên
+
+            response.getOutputStream().flush(); // Đảm bảo tất cả dữ liệu được gửi đi
+        } catch (IOException e) {
+            // Ghi log lỗi. Trong môi trường production, sử dụng một framework logging phù hợp.
+            System.err.println("Lỗi xảy ra khi xuất departments ra Excel: " + e.getMessage());
+            // Rất khó để gửi một phản hồi lỗi rõ ràng cho client ở giai đoạn này
+            // nếu header đã được gửi và stream đang được sử dụng.
+            // Client có thể nhận được file bị lỗi hoặc tải xuống không hoàn chỉnh.
         }
     }
 }
