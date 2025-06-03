@@ -13,16 +13,21 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.List;
 import java.util.UUID;
 import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/api/v1/departments") // Đường dẫn cơ sở cho các endpoint của department
 public class DepartmentController {
 
     private final DepartmentService departmentService;
+
+    private static final Logger logger = LoggerFactory.getLogger(DepartmentController.class);
 
     @Autowired
     public DepartmentController(DepartmentService departmentService) {
@@ -54,7 +59,7 @@ public class DepartmentController {
         try {
             Department createdDepartment = departmentService.createDepartment(department);
             return new ResponseEntity<>(createdDepartment, HttpStatus.CREATED); // Trả về 201 Created
-        } catch (Exception e) {
+        } catch (DataIntegrityViolationException e) { // Bắt lỗi cụ thể hơn nếu có thể
             // Xử lý các lỗi tiềm ẩn, ví dụ: department_name đã tồn tại (do constraint unique)
             // Bạn có thể muốn có một GlobalExceptionHandler để xử lý các lỗi này một cách nhất quán.
             return ResponseEntity.status(HttpStatus.CONFLICT).body("Error creating department: " + e.getMessage());
@@ -143,12 +148,39 @@ public class DepartmentController {
             workbook.close(); // Quan trọng: đóng workbook để giải phóng tài nguyên
 
             response.getOutputStream().flush(); // Đảm bảo tất cả dữ liệu được gửi đi
-        } catch (IOException e) {
+        } catch (IOException ex) {
             // Ghi log lỗi. Trong môi trường production, sử dụng một framework logging phù hợp.
-            System.err.println("Lỗi xảy ra khi xuất departments ra Excel: " + e.getMessage());
+            logger.error("Lỗi xảy ra khi xuất departments ra Excel: {}", ex.getMessage(), ex);
             // Rất khó để gửi một phản hồi lỗi rõ ràng cho client ở giai đoạn này
             // nếu header đã được gửi và stream đang được sử dụng.
             // Client có thể nhận được file bị lỗi hoặc tải xuống không hoàn chỉnh.
+        } catch (Exception ex) { // Bắt các lỗi không mong muốn khác
+            logger.error("Lỗi không xác định khi xuất Excel: {}", ex.getMessage(), ex);
+        }
+    }
+
+    // GET: Xuất danh sách departments ra file Excel từ template
+    @GetMapping("/export/excel-from-template")
+    public void exportDepartmentsToExcelFromTemplate(HttpServletResponse response) {
+        try {
+            String filename = "departments_report_" + System.currentTimeMillis() + ".xlsx";
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+
+            XSSFWorkbook workbook = departmentService.generateDepartmentsExcelFromTemplate();
+
+            workbook.write(response.getOutputStream());
+            workbook.close();
+
+            response.getOutputStream().flush();
+        } catch (IOException ex) {
+            logger.error("Lỗi IO khi xuất departments từ template: {}", ex.getMessage(), ex);
+            // Cân nhắc việc thiết lập HTTP status code lỗi nếu có thể và header chưa được gửi.
+            // if (!response.isCommitted()) {
+            //     response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            // }
+        } catch (Exception ex) { // Bắt các lỗi khác có thể xảy ra
+            logger.error("Lỗi không xác định khi xuất Excel từ template: {}", ex.getMessage(), ex);
         }
     }
 }

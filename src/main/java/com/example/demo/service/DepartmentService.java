@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.data.domain.Pageable;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,4 +30,6 @@ public interface DepartmentService {
      * @return XSSFWorkbook chứa dữ liệu.
      */
     XSSFWorkbook generateDepartmentsExcel();
+
+    XSSFWorkbook generateDepartmentsExcelFromTemplate() throws IOException; // Phương thức mới
 }

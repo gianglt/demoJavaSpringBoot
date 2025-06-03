@@ -21,13 +21,18 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.core.io.ClassPathResource;
 
+import java.io.InputStream;
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.apache.poi.ss.util.CellRangeAddress;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class DepartmentServiceImpl implements DepartmentService {
@@ -223,5 +228,86 @@ public class DepartmentServiceImpl implements DepartmentService {
         }
 
         return workbook;
-    }    
+    }
+
+    private static final String DEPARTMENTS_TEMPLATE_PATH = "templates/departments.xlsx";
+    // Dữ liệu sẽ bắt đầu được ghi từ dòng thứ 4 trong file Excel (index là 3).
+    // Dòng 1 (index 0): Tiêu đề chính của báo cáo.
+    // Dòng 2 (index 1): Có thể là dòng trống hoặc thông tin phụ.
+    // Dòng 3 (index 2): Tiêu đề các cột (ID Phòng Ban, Tên Phòng Ban, ...).
+    private static final int DATA_START_ROW_INDEX_IN_TEMPLATE = 3;
+    private static final int HEADER_ROW_INDEX_IN_TEMPLATE = 2; // Dòng chứa header cột là dòng 3 (index 2)
+
+    private static final Logger logger = LoggerFactory.getLogger(DepartmentServiceImpl.class);
+
+    @Override
+    public XSSFWorkbook generateDepartmentsExcelFromTemplate() throws IOException {
+        InputStream templateInputStream = null;
+        try {
+            // Tải file template từ thư mục resources/templates
+            templateInputStream = new ClassPathResource(DEPARTMENTS_TEMPLATE_PATH).getInputStream();
+            if (templateInputStream == null) {
+                throw new IOException("Không thể tìm thấy file template: " + DEPARTMENTS_TEMPLATE_PATH);
+            }
+            XSSFWorkbook workbook = new XSSFWorkbook(templateInputStream);
+            XSSFSheet sheet = workbook.getSheetAt(0); // Giả sử làm việc với sheet đầu tiên
+
+            List<Department> departments = getAllDepartments();
+
+            // Xác định số cột từ header trong template (dòng 3, index 2)
+            Row headerDefinitionRow = sheet.getRow(HEADER_ROW_INDEX_IN_TEMPLATE);
+            int numberOfColumns = 0;
+            if (headerDefinitionRow != null) {
+                numberOfColumns = headerDefinitionRow.getLastCellNum(); // getLastCellNum() trả về số cột + 1 (1-based)
+            } else {
+                logger.warn("Không tìm thấy dòng header (dòng {}) trong template. Sẽ sử dụng mặc định 4 cột cho footer.", HEADER_ROW_INDEX_IN_TEMPLATE + 1);
+                numberOfColumns = 4; // Fallback nếu template không đúng chuẩn
+            }
+            if (numberOfColumns <= 0) { // Đảm bảo numberOfColumns luôn dương
+                logger.warn("Số cột đọc từ template là {}. Sẽ sử dụng mặc định 4 cột cho footer.", numberOfColumns);
+                numberOfColumns = 4;
+            }
+
+            int currentRowIdx = DATA_START_ROW_INDEX_IN_TEMPLATE;
+            if (departments != null) {
+                for (Department department : departments) {
+                    Row row = sheet.createRow(currentRowIdx++); // Tạo dòng mới cho dữ liệu
+
+                    row.createCell(0).setCellValue(department.getDepartmentId() != null ? department.getDepartmentId().toString() : "N/A");
+                    row.createCell(1).setCellValue(department.getDepartmentName() != null ? department.getDepartmentName() : "");
+                    row.createCell(2).setCellValue(department.getDescription() != null ? department.getDescription() : "");
+                    row.createCell(3).setCellValue(department.getLocation() != null ? department.getLocation() : "");
+                    // Nếu template của bạn có nhiều hơn 4 cột dữ liệu, bạn cần thêm các row.createCell(index).setCellValue(...) tương ứng.
+                }
+            }
+
+            // --- Tạo dòng Chân trang (Footer) ---
+            // Footer sẽ được đặt sau dòng dữ liệu cuối cùng, cách 1 dòng trống
+            int footerRowIdx = (departments == null || departments.isEmpty()) ? DATA_START_ROW_INDEX_IN_TEMPLATE + 1 : currentRowIdx + 1;
+
+            Row footerRow = sheet.createRow(footerRowIdx);
+            Cell footerCell = footerRow.createCell(0); // Footer bắt đầu từ cột đầu tiên
+
+            CellStyle footerCellStyle = workbook.createCellStyle(); // Nên tạo style mới hoặc lấy từ template nếu có
+            Font footerFont = workbook.createFont();
+            footerFont.setItalic(true);
+            footerFont.setFontHeightInPoints((short) 10);
+            footerCellStyle.setFont(footerFont);
+            footerCellStyle.setAlignment(HorizontalAlignment.RIGHT);
+
+            LocalDateTime now = LocalDateTime.now();
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+            footerCell.setCellValue("Báo cáo được tạo lúc: " + now.format(formatter));
+            footerCell.setCellStyle(footerCellStyle);
+
+            // Gộp ô cho footer dựa trên số cột đã xác định từ template
+            sheet.addMergedRegion(new CellRangeAddress(footerRowIdx, footerRowIdx, 0, numberOfColumns - 1));
+
+            return workbook;
+        } finally {
+            if (templateInputStream != null) {
+                templateInputStream.close();
+            }
+        }
+    }
 }
