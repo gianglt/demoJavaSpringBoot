@@ -13,6 +13,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import net.sf.jasperreports.engine.JRException;
+import java.io.IOException;
+
+
 public interface DepartmentService {
     List<Department> getAllDepartments(); // Lấy tất cả department
     Optional<Department> getDepartmentById(UUID id); // Lấy department theo ID
@@ -41,4 +45,8 @@ public interface DepartmentService {
      * @return ImportResult summarizing the import process.
      */
     ImportResult importDepartmentsFromExcel(MultipartFile file) throws IOException;
+    
+    byte[] generateDepartmentReportPdf() throws JRException, IOException;
+byte[] generateDepartmentReportExcel() throws JRException, IOException;
+    byte[] generateDepartmentReportWord() throws JRException, IOException;    
 }

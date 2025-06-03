@@ -61,6 +61,12 @@
 			<artifactId>poi-ooxml</artifactId>
 			<version>5.2.5</version>			<!-- Bạn có thể sử dụng phiên bản mới nhất -->
 		</dependency>
+
+<dependency>
+    <groupId>net.sf.jasperreports</groupId>
+    <artifactId>jasperreports</artifactId>
+    <version>6.20.0</version> <!-- Bạn có thể chọn phiên bản mới nhất -->
+</dependency>		
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<fontFamilies>
+    <fontFamily name="Arial">
+        <normal>
+            <ttf>fonts/arial.ttf</ttf>
+        </normal>
+        <bold>
+            <ttf>fonts/arialbd.ttf</ttf>
+        </bold>
+        <italic>
+            <ttf>fonts/ariali.ttf</ttf>
+        </italic>
+        <boldItalic>
+            <ttf>fonts/arialbi.ttf</ttf>
+        </boldItalic>
+        <!--
+            pdfEncoding:
+            - CP1252 (Western European) là một lựa chọn phổ biến.
+            - Identity-H (Unicode with horizontal writing) thường được khuyến nghị cho hỗ trợ đa ngôn ngữ, bao gồm tiếng Việt.
+            isPdfEmbedded:
+            - true: Nhúng font vào file PDF. Điều này làm tăng kích thước file PDF một chút nhưng đảm bảo font hiển thị đúng ở mọi nơi.
+            - false: Không nhúng font. PDF sẽ dựa vào font có sẵn trên hệ thống của người xem.
+        -->
+        <pdfEncoding>Identity-H</pdfEncoding>
+        <exportFonts>
+            <export key="net.sf.jasperreports.html">'Arial', sans-serif</export>
+            <export key="net.sf.jasperreports.xhtml">'Arial', sans-serif</export>
+        </exportFonts>
+        <isPdfEmbedded>true</isPdfEmbedded>
+    </fontFamily>
+</fontFamilies>

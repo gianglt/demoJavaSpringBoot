@@ -13,6 +13,7 @@ import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
@@ -26,16 +27,33 @@ import org.springframework.util.StringUtils;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.Optional;
 import java.util.UUID;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+// Imports cho JasperReports
+import net.sf.jasperreports.engine.JasperCompileManager;
+import net.sf.jasperreports.engine.JasperExportManager;
+import net.sf.jasperreports.engine.JasperFillManager;
+import net.sf.jasperreports.engine.JasperPrint;
+import net.sf.jasperreports.engine.JasperReport;
+import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
+import net.sf.jasperreports.engine.JRException;
+import net.sf.jasperreports.engine.export.JRRtfExporter;
+import net.sf.jasperreports.engine.export.ooxml.JRDocxExporter;
+import net.sf.jasperreports.engine.export.ooxml.JRXlsxExporter;
+import net.sf.jasperreports.export.SimpleExporterInput;
+import net.sf.jasperreports.export.SimpleOutputStreamExporterOutput;
 
 @Service
 public class DepartmentServiceImpl implements DepartmentService {
@@ -385,5 +403,67 @@ public class DepartmentServiceImpl implements DepartmentService {
     private String getCellValueAsString(Row row, int cellIndex, DataFormatter dataFormatter) {
         Cell cell = row.getCell(cellIndex);
         return dataFormatter.formatCellValue(cell).trim();
+    }
+
+    private JasperPrint prepareDepartmentJasperPrint() throws JRException, IOException {
+        List<Department> departments = getAllDepartments(); // Lấy tất cả department
+    
+        // Tải file template .jrxml
+        InputStream reportStream = new ClassPathResource("reports/departments_report.jrxml").getInputStream();
+        if (reportStream == null) {
+            throw new IOException("Không thể tìm thấy file template: reports/departments_report.jrxml");
+        }
+
+        // Biên dịch template
+        JasperReport jasperReport = JasperCompileManager.compileReport(reportStream);
+        reportStream.close(); // Đóng stream sau khi biên dịch
+
+        // Tạo nguồn dữ liệu từ danh sách department
+        JRBeanCollectionDataSource dataSource = new JRBeanCollectionDataSource(departments);
+
+        // Tham số (nếu có, ví dụ: tiêu đề báo cáo có thể truyền từ đây)
+        Map<String, Object> parameters = new HashMap<>();
+        // parameters.put("REPORT_TITLE", "DANH SÁCH PHÒNG BAN TÙY CHỈNH"); // Ví dụ nếu bạn muốn truyền động
+    
+        // Điền dữ liệu vào báo cáo
+        return JasperFillManager.fillReport(jasperReport, parameters, dataSource);
+    }
+
+    @Override
+    public byte[] generateDepartmentReportPdf() throws JRException, IOException {
+        JasperPrint jasperPrint = prepareDepartmentJasperPrint();
+
+        // Xuất báo cáo ra dạng PDF (byte array)
+        return JasperExportManager.exportReportToPdf(jasperPrint);
+    }
+
+    @Override
+    public byte[] generateDepartmentReportExcel() throws JRException, IOException {
+        JasperPrint jasperPrint = prepareDepartmentJasperPrint();
+
+        JRXlsxExporter exporter = new JRXlsxExporter();
+        ByteArrayOutputStream xlsxStream = new ByteArrayOutputStream();
+
+        exporter.setExporterInput(new SimpleExporterInput(jasperPrint));
+        exporter.setExporterOutput(new SimpleOutputStreamExporterOutput(xlsxStream));
+        // Optional: Cấu hình thêm cho Excel nếu cần
+        // SimpleXlsxReportConfiguration configuration = new SimpleXlsxReportConfiguration();
+        // configuration.setOnePagePerSheet(true); // Mỗi trang Jasper là một sheet Excel
+        // configuration.setDetectCellType(true);
+        // exporter.setConfiguration(configuration);
+        exporter.exportReport();
+
+        return xlsxStream.toByteArray();
+    }
+
+    @Override
+    public byte[] generateDepartmentReportWord() throws JRException, IOException {
+        JasperPrint jasperPrint = prepareDepartmentJasperPrint();
+        JRDocxExporter exporter = new JRDocxExporter(); // Xuất ra .docx
+        ByteArrayOutputStream docxStream = new ByteArrayOutputStream();
+        exporter.setExporterInput(new SimpleExporterInput(jasperPrint));
+        exporter.setExporterOutput(new SimpleOutputStreamExporterOutput(docxStream));
+        exporter.exportReport();
+        return docxStream.toByteArray();
     }
 }

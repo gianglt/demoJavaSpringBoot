@@ -7,7 +7,8 @@ import com.example.demo.dto.ImportResult;
 import com.example.demo.dto.DepartmentSearchCriteria;
 import com.example.demo.model.Department;
 import com.example.demo.service.DepartmentService;
-import jakarta.validation.Valid; 
+import jakarta.validation.Valid;
+import net.sf.jasperreports.engine.JRException;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,8 +21,22 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 import java.util.UUID;
 import java.io.IOException;
+import java.net.http.HttpHeaders;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import jakarta.servlet.http.HttpServletResponse;
+
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/departments") // Đường dẫn cơ sở cho các endpoint của department
@@ -54,7 +69,8 @@ public class DepartmentController {
     // POST: Tạo một department mới
     @PostMapping
     public ResponseEntity<?> createDepartment(@Valid @RequestBody Department department) {
-        // Kiểm tra xem client có gửi departmentId không, nếu có thì không hợp lệ cho việc tạo mới.
+        // Kiểm tra xem client có gửi departmentId không, nếu có thì không hợp lệ cho
+        // việc tạo mới.
         if (department.getDepartmentId() != null) {
             return ResponseEntity.badRequest().body("Department ID must be null for creation.");
         }
@@ -62,15 +78,18 @@ public class DepartmentController {
             Department createdDepartment = departmentService.createDepartment(department);
             return new ResponseEntity<>(createdDepartment, HttpStatus.CREATED); // Trả về 201 Created
         } catch (DataIntegrityViolationException e) { // Bắt lỗi cụ thể hơn nếu có thể
-            // Xử lý các lỗi tiềm ẩn, ví dụ: department_name đã tồn tại (do constraint unique)
-            // Bạn có thể muốn có một GlobalExceptionHandler để xử lý các lỗi này một cách nhất quán.
+            // Xử lý các lỗi tiềm ẩn, ví dụ: department_name đã tồn tại (do constraint
+            // unique)
+            // Bạn có thể muốn có một GlobalExceptionHandler để xử lý các lỗi này một cách
+            // nhất quán.
             return ResponseEntity.status(HttpStatus.CONFLICT).body("Error creating department: " + e.getMessage());
         }
     }
 
     // PUT: Cập nhật một department đã tồn tại
     @PutMapping("/{id}")
-    public ResponseEntity<Department> updateDepartment(@PathVariable UUID id, @Valid @RequestBody Department departmentDetails) {
+    public ResponseEntity<Department> updateDepartment(@PathVariable UUID id,
+            @Valid @RequestBody Department departmentDetails) {
         return departmentService.updateDepartment(id, departmentDetails)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
@@ -99,7 +118,8 @@ public class DepartmentController {
     // GET: Tìm kiếm departments theo keyword, có thể phân trang hoặc trả về tất cả
     @GetMapping("/search")
     public ResponseEntity<?> searchDepartments(
-            @RequestParam(name = "keyword", defaultValue = "") String keyword, // Mặc định keyword là chuỗi rỗng nếu không được cung cấp
+            @RequestParam(name = "keyword", defaultValue = "") String keyword, // Mặc định keyword là chuỗi rỗng nếu
+                                                                               // không được cung cấp
             @RequestParam(name = "page", required = false) Integer page,
             @RequestParam(name = "size", required = false) Integer size) {
 
@@ -115,7 +135,8 @@ public class DepartmentController {
         }
     }
 
-    // POST: Tìm kiếm departments nâng cao theo name và description, có thể phân trang hoặc trả về tất cả
+    // POST: Tìm kiếm departments nâng cao theo name và description, có thể phân
+    // trang hoặc trả về tất cả
     @PostMapping("/search-advanced")
     public ResponseEntity<?> searchDepartmentsAdvanced(
             @RequestBody DepartmentSearchCriteria criteria, // Nhận tiêu chí tìm kiếm từ request body
@@ -139,7 +160,8 @@ public class DepartmentController {
     public void exportDepartmentsToExcel(HttpServletResponse response) {
         try {
             // Đặt content type và header cho việc tải file Excel
-            // Sử dụng timestamp trong tên file để tránh vấn đề caching và đảm bảo tính duy nhất
+            // Sử dụng timestamp trong tên file để tránh vấn đề caching và đảm bảo tính duy
+            // nhất
             String filename = "departments_" + System.currentTimeMillis() + ".xlsx";
             response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
             response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
@@ -151,7 +173,8 @@ public class DepartmentController {
 
             response.getOutputStream().flush(); // Đảm bảo tất cả dữ liệu được gửi đi
         } catch (IOException ex) {
-            // Ghi log lỗi. Trong môi trường production, sử dụng một framework logging phù hợp.
+            // Ghi log lỗi. Trong môi trường production, sử dụng một framework logging phù
+            // hợp.
             logger.error("Lỗi xảy ra khi xuất departments ra Excel: {}", ex.getMessage(), ex);
             // Rất khó để gửi một phản hồi lỗi rõ ràng cho client ở giai đoạn này
             // nếu header đã được gửi và stream đang được sử dụng.
@@ -177,9 +200,10 @@ public class DepartmentController {
             response.getOutputStream().flush();
         } catch (IOException ex) {
             logger.error("Lỗi IO khi xuất departments từ template: {}", ex.getMessage(), ex);
-            // Cân nhắc việc thiết lập HTTP status code lỗi nếu có thể và header chưa được gửi.
+            // Cân nhắc việc thiết lập HTTP status code lỗi nếu có thể và header chưa được
+            // gửi.
             // if (!response.isCommitted()) {
-            //     response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            // response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             // }
         } catch (Exception ex) { // Bắt các lỗi khác có thể xảy ra
             logger.error("Lỗi không xác định khi xuất Excel từ template: {}", ex.getMessage(), ex);
@@ -194,8 +218,11 @@ public class DepartmentController {
         }
         // Optional: Add more specific file type validation (e.g., for .xlsx)
         // String contentType = file.getContentType();
-        // if (contentType == null || !contentType.equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) {
-        //     return ResponseEntity.badRequest().body("Invalid file type. Only .xlsx files are allowed.");
+        // if (contentType == null ||
+        // !contentType.equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+        // {
+        // return ResponseEntity.badRequest().body("Invalid file type. Only .xlsx files
+        // are allowed.");
         // }
 
         try {
@@ -203,10 +230,56 @@ public class DepartmentController {
             return ResponseEntity.ok(result);
         } catch (IOException e) {
             logger.error("Lỗi IO khi import departments từ Excel: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to process Excel file: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to process Excel file: " + e.getMessage());
         } catch (Exception e) { // Catch other potential errors during import
             logger.error("Lỗi không xác định khi import departments từ Excel: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An unexpected error occurred during import: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("An unexpected error occurred during import: " + e.getMessage());
         }
     }
+
+    @GetMapping("/export/pdf")
+    public void exportDepartmentsToPdf(HttpServletResponse response) throws IOException, JRException {
+        byte[] pdfReport = departmentService.generateDepartmentReportPdf();
+
+        response.setContentType("application/pdf");
+        String currentDateTime = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        String headerValue = "attachment; filename=\"departments_report_" + currentDateTime + ".pdf\"";
+        response.setHeader("Content-Disposition", headerValue);
+        response.setContentLength(pdfReport.length);
+
+        response.getOutputStream().write(pdfReport);
+        response.getOutputStream().flush();
+    }
+
+@GetMapping("/export/excel-jasper") // Đổi tên để phân biệt với export Excel bằng Apache POI thuần
+    public void exportDepartmentsToExcelJasper(HttpServletResponse response) throws IOException, JRException {
+        byte[] excelReport = departmentService.generateDepartmentReportExcel();
+
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        String currentDateTime = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        String headerValue = "attachment; filename=\"departments_report_jasper_" + currentDateTime + ".xlsx\"";
+        response.setHeader("Content-Disposition", headerValue);
+        response.setContentLength(excelReport.length);
+
+        response.getOutputStream().write(excelReport);
+        response.getOutputStream().flush();
+    }
+
+    @GetMapping("/export/word-jasper") // Đổi tên để thể hiện rõ dùng Jasper
+    public void exportDepartmentsToWordJasper(HttpServletResponse response) throws IOException, JRException {
+        byte[] wordReport = departmentService.generateDepartmentReportWord();
+
+        response.setContentType("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        String currentDateTime = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        String headerValue = "attachment; filename=\"departments_report_jasper_" + currentDateTime + ".docx\"";
+        response.setHeader("Content-Disposition", headerValue);
+        response.setContentLength(wordReport.length);
+
+        response.getOutputStream().write(wordReport);
+        response.getOutputStream().flush();
+    }
+
+    
 }
