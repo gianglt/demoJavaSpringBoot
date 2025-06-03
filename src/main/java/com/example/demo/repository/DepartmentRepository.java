@@ -22,4 +22,7 @@ public interface DepartmentRepository extends JpaRepository<Department, UUID> {
 
     Page<Department> findByDescriptionContainingIgnoreCase(String description, Pageable pageable);
     List<Department> findByDescriptionContainingIgnoreCase(String description);
+
+    // Method to check for duplicates by name and location (case-insensitive)
+    boolean existsByDepartmentNameIgnoreCaseAndLocationIgnoreCase(String departmentName, String location);    
 }

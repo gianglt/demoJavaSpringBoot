@@ -1,6 +1,7 @@
 package com.example.demo.service.impl;
 
 import com.example.demo.dto.DepartmentSearchCriteria;
+import com.example.demo.dto.ImportResult;
 import com.example.demo.model.Department;
 import com.example.demo.repository.DepartmentRepository;
 import com.example.demo.service.DepartmentService;
@@ -10,6 +11,7 @@ import org.apache.poi.ss.usermodel.FillPatternType;
 import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -22,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.io.IOException;
@@ -238,6 +241,12 @@ public class DepartmentServiceImpl implements DepartmentService {
     private static final int DATA_START_ROW_INDEX_IN_TEMPLATE = 3;
     private static final int HEADER_ROW_INDEX_IN_TEMPLATE = 2; // Dòng chứa header cột là dòng 3 (index 2)
 
+    // Constants for Excel import
+    private static final int IMPORT_COL_INDEX_DEPARTMENT_NAME = 1; // "Tên Phòng Ban"
+    private static final int IMPORT_COL_INDEX_DESCRIPTION = 2;     // "Mô Tả"
+    private static final int IMPORT_COL_INDEX_LOCATION = 3;        // "Vị Trí"
+    private static final int IMPORT_DATA_START_ROW_INDEX = 3;      // Data starts from the 4th row (index 3)
+
     private static final Logger logger = LoggerFactory.getLogger(DepartmentServiceImpl.class);
 
     @Override
@@ -309,5 +318,72 @@ public class DepartmentServiceImpl implements DepartmentService {
                 templateInputStream.close();
             }
         }
+    }
+
+    @Override
+    @Transactional // Optional: consider if the entire import should be one transaction
+    public ImportResult importDepartmentsFromExcel(MultipartFile file) throws IOException {
+        ImportResult result = new ImportResult();
+        InputStream inputStream = file.getInputStream();
+        XSSFWorkbook workbook = new XSSFWorkbook(inputStream);
+        XSSFSheet sheet = workbook.getSheetAt(0); // Assuming data is in the first sheet
+
+        DataFormatter dataFormatter = new DataFormatter();
+
+        int lastRowNum = sheet.getLastRowNum();
+        for (int i = IMPORT_DATA_START_ROW_INDEX; i <= lastRowNum; i++) {
+            Row row = sheet.getRow(i);
+            if (row == null) { // Skip entirely empty rows
+                continue;
+            }
+
+            try {
+                String departmentName = getCellValueAsString(row, IMPORT_COL_INDEX_DEPARTMENT_NAME, dataFormatter);
+                String description = getCellValueAsString(row, IMPORT_COL_INDEX_DESCRIPTION, dataFormatter);
+                String location = getCellValueAsString(row, IMPORT_COL_INDEX_LOCATION, dataFormatter);
+
+                // Basic validation: Department name is mandatory
+                if (!StringUtils.hasText(departmentName)) {
+                    result.incrementFailedRows();
+                    result.addErrorMessage("Row " + (i + 1) + ": Department name is missing or empty.");
+                    logger.warn("Skipping row {}: Department name is missing.", i + 1);
+                    continue;
+                }
+                 // Location is also considered mandatory for the duplicate check logic
+                if (!StringUtils.hasText(location)) {
+                    result.incrementFailedRows();
+                    result.addErrorMessage("Row " + (i + 1) + ": Location is missing or empty.");
+                    logger.warn("Skipping row {}: Location is missing.", i + 1);
+                    continue;
+                }
+
+
+                // Check for duplicates: same name AND same location (case-insensitive)
+                if (departmentRepository.existsByDepartmentNameIgnoreCaseAndLocationIgnoreCase(departmentName, location)) {
+                    result.incrementSkippedDuplicates();
+                    logger.info("Skipping duplicate department: Name='{}', Location='{}' at row {}", departmentName, location, i + 1);
+                } else {
+                    Department department = new Department();
+                    department.setDepartmentName(departmentName);
+                    department.setDescription(description);
+                    department.setLocation(location);
+                    departmentRepository.save(department);
+                    result.incrementSuccessfulImports();
+                }
+            } catch (Exception e) {
+                result.incrementFailedRows();
+                result.addErrorMessage("Row " + (i + 1) + ": Error processing row - " + e.getMessage());
+                logger.error("Error processing row {} from Excel: {}", i + 1, e.getMessage(), e);
+            }
+        }
+
+        workbook.close();
+        inputStream.close();
+        return result;
+    }
+
+    private String getCellValueAsString(Row row, int cellIndex, DataFormatter dataFormatter) {
+        Cell cell = row.getCell(cellIndex);
+        return dataFormatter.formatCellValue(cell).trim();
     }
 }

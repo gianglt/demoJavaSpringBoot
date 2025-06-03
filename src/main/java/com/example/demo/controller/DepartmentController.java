@@ -3,6 +3,7 @@ package com.example.demo.controller;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import com.example.demo.dto.ImportResult;
 import com.example.demo.dto.DepartmentSearchCriteria;
 import com.example.demo.model.Department;
 import com.example.demo.service.DepartmentService;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -181,6 +183,30 @@ public class DepartmentController {
             // }
         } catch (Exception ex) { // Bắt các lỗi khác có thể xảy ra
             logger.error("Lỗi không xác định khi xuất Excel từ template: {}", ex.getMessage(), ex);
+        }
+    }
+
+    // POST: Import departments from Excel file
+    @PostMapping("/import/excel")
+    public ResponseEntity<?> importDepartmentsFromExcel(@RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body("Please upload an Excel file.");
+        }
+        // Optional: Add more specific file type validation (e.g., for .xlsx)
+        // String contentType = file.getContentType();
+        // if (contentType == null || !contentType.equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) {
+        //     return ResponseEntity.badRequest().body("Invalid file type. Only .xlsx files are allowed.");
+        // }
+
+        try {
+            ImportResult result = departmentService.importDepartmentsFromExcel(file);
+            return ResponseEntity.ok(result);
+        } catch (IOException e) {
+            logger.error("Lỗi IO khi import departments từ Excel: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to process Excel file: " + e.getMessage());
+        } catch (Exception e) { // Catch other potential errors during import
+            logger.error("Lỗi không xác định khi import departments từ Excel: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An unexpected error occurred during import: " + e.getMessage());
         }
     }
 }

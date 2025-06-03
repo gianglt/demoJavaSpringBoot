@@ -1,10 +1,12 @@
 package com.example.demo.service;
 
 import com.example.demo.dto.DepartmentSearchCriteria;
+import com.example.demo.dto.ImportResult;
 import com.example.demo.model.Department;
 import org.springframework.data.domain.Page;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.data.domain.Pageable;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
@@ -32,4 +34,11 @@ public interface DepartmentService {
     XSSFWorkbook generateDepartmentsExcel();
 
     XSSFWorkbook generateDepartmentsExcelFromTemplate() throws IOException; // Phương thức mới
+
+    /**
+     * Imports departments from an Excel file.
+     * @param file The Excel file containing department data.
+     * @return ImportResult summarizing the import process.
+     */
+    ImportResult importDepartmentsFromExcel(MultipartFile file) throws IOException;
 }
